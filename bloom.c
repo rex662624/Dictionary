@@ -2,11 +2,45 @@
 #include"stdint.h"
 #include"stdlib.h"
 
+
+unsigned int djb2(const void *_str)
+{
+    const char *str = _str;
+    unsigned int hash = 5381;
+    char c;
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c;
+    }
+    return hash;
+}
+
+unsigned int jenkins(const void *_str)
+{
+    const char *key = _str;
+    unsigned int hash=0;
+    while (*key) {
+        hash += *key;
+        hash += (hash << 10);
+        hash ^= (hash >> 6);
+        key++;
+    }
+    hash += (hash << 3);
+    hash ^= (hash >> 11);
+    hash += (hash << 15);
+    return hash;
+}
+
+
 bloom_t bloom_create(size_t size)
 {
     bloom_t res = calloc(1, sizeof(struct bloom_filter));
     res->size = size;
     res->bits = malloc(size);
+
+    //加入hash function
+    bloom_add_hash(res, djb2);
+    bloom_add_hash(res, jenkins);
+
     return res;
 }
 

@@ -24,7 +24,7 @@ $(GIT_HOOKS):
 	@echo
 
 OBJS_LIB = \
-    tst.o
+    tst.o bloom.o
 
 OBJS := \
     $(OBJS_LIB) \
@@ -35,7 +35,7 @@ deps := $(OBJS:%.o=.%.o.d)
 
 test_%: test_%.o $(OBJS_LIB)
 	$(VECHO) "  LD\t$@\n"
-	$(Q)$(CC) $(LDFLAGS) -o $@ $^
+	$(Q)$(CC) $(LDFLAGS)  -o $@ $^ -lm
 
 %.o: %.c
 	$(VECHO) "  CC\t$@\n"

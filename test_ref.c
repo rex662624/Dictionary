@@ -2,9 +2,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 #include "tst.h"
 #include "bench.c"
+//---bloom filter
+#include "bloom.h"
+
+#define TableSize 5000000	//bloom filter 的大小
+#define HashNumber 2	//有多少個 hash function
+//---------------
 /** constants insert, delete, max word(s) & stack nodes */
 enum { INS, DEL, WRDMAX = 256, STKMAX = 512, LMAX = 1024 };
 
@@ -39,6 +46,10 @@ int main(int argc, char **argv)
         return 1;
     }
     t1 = tvgetf();
+
+//先 create出一個 bloom filter
+    bloom_t bloom = bloom_create(TableSize);
+
 //******memorypool*****
     char *pool = (char *) malloc(poolsize * sizeof(char));
     char *Top = pool;
@@ -51,7 +62,7 @@ int main(int argc, char **argv)
             fclose(fp);
             return 1;
         } else { //有insert 進資料結構，因此也要加入bloom filter
-            //FIXME
+            bloom_add(bloom,Top);
         }
         idx++;
         Top += (strlen(Top) + 1);
@@ -61,26 +72,26 @@ int main(int argc, char **argv)
     printf("ternary_tree, loaded %d words in %.6f sec\n", idx,t2-t1);
 //****************bench for distribution***********
     /*
-        if (argc == 2 && strcmp(argv[1], "--bench") == 0) {
+            if (argc == 2 && strcmp(argv[1], "--bench") == 0) {
 
-            int stat = bench_test(root, BENCH_TEST_FILE, LMAX);
-            tst_free(root);
-            free(pool);
-            return stat;
+                int stat = bench_test(root, BENCH_TEST_FILE, LMAX);
+                tst_free(root);
+                free(pool);
+                return stat;
 
-        }
+            }
 
-
-    //*********************output
-        FILE *output;
-        output = fopen("ref.txt", "a");
-        if(output!=NULL) {
-            fprintf(output, "%.6f\n",t2-t1);
-            fclose(output);
-        } else
-            printf("open file error\n");
     */
+    //*********************output
+    /*       FILE *output;
+           output = fopen("ref.txt", "a");
+           if(output!=NULL) {
+               fprintf(output, "%.6f\n",t2-t1);
+               fclose(output);
+           } else
+               printf("open file error\n");
 
+    */
 //*********************
 
 
@@ -140,12 +151,23 @@ int main(int argc, char **argv)
             }
             rmcrlf(word);
             t1 = tvgetf();
-            res = tst_search(root, word);
-            t2 = tvgetf();
-            if (res)
-                printf("  found %s in %.6f sec.\n", (char *) res, t2 - t1);
-            else
-                printf("  %s not found.\n", word);
+
+            //用bloom filter去判斷是否在 tree 內
+            if (bloom_test(bloom,word)==1) {
+                //version1:bloom filter偵測到在裡面就不走下去了
+                t2 = tvgetf();
+                printf("  Bloomfilter found %s in %.6f sec.\n",word, t2 - t1);
+                printf("  Probability of false positives:%lf\n",pow(1 - exp(-(double)HashNumber /(double) ((double)TableSize /(double) idx)), HashNumber));
+                // version2:bloom filter偵測到在裡面,就去走tree(防止偵測錯誤)
+                t1 = tvgetf();
+                res = tst_search(root, word);
+                t2 = tvgetf();
+                if(res)
+                    printf("  ----------\n  Tree found %s in %.6f sec.\n", (char *) res, t2- t1);
+                else
+                    printf("  ----------\n  %s not found by tree.\n", word);
+            } else
+                printf("  %s not found by bloom filter.\n", word);
             break;
         case 's':
             printf("find words matching prefix (at least 1 char): ");
@@ -158,7 +180,6 @@ int main(int argc, char **argv)
             }
             rmcrlf(word);
             t1 = tvgetf();
-
             res = tst_search_prefix(root, word, sgl, &sidx, LMAX);
             t2 = tvgetf();
             if (res) {
@@ -202,5 +223,6 @@ quit:
         }
     }
     //pool_free(pool);
+    bloom_free(bloom);
     return 0;
 }
