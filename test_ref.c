@@ -128,7 +128,12 @@ int main(int argc, char **argv)
             p = Top;
             t1 = tvgetf();
             /* FIXME: insert reference to each string */
-            res = tst_ins_del(&root, &p, INS, REF);
+            if(bloom_test(bloom,Top)==1)//已經被filter偵測存在，不要走tree
+                res=NULL;
+            else { //否則就去走訪tree加入,並加入bloom filter
+                bloom_add(bloom,Top);
+                res = tst_ins_del(&root, &p, INS, REF);
+            }
             t2 = tvgetf();
             if (res) {
                 idx++;
