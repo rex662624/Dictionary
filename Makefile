@@ -59,4 +59,5 @@ clean:
 	$(RM) $(TESTS) $(OBJS)
 	$(RM) $(deps)
 	rm -f  bench_cpy.txt bench_ref.txt ref.txt cpy.txt caculate
+	rm -f unit-test/testdict unit-test/bloomtest
 -include $(deps)
