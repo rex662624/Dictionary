@@ -17,7 +17,6 @@
 //#include "bench.c"
 //---bloom filter
 #include "bloom.h"
-
 #define TableSize 5000000	//bloom filter 的大小
 #define HashNumber 2	//有多少個 hash function
 enum { INS, DEL, WRDMAX = 256, STKMAX = 512, LMAX = 1024 };
@@ -56,13 +55,6 @@ int *forClientSockfd;//動態配置,存放每個client的descriper
 pthread_t *thread;
 
 void *thread_function(void *);
-void getprocessid(int []);
-void getstat(char[],int,char);
-void getchild(int[], int,char );
-void getcmdline(char[], int );
-void getthread(int[], int);
-void getancient(int [],int,int);
-
 //-----memorypool還有bloom filter資訊是所有thread共享,放global
 char * pool;
 char * Top;
@@ -184,20 +176,21 @@ void *thread_function(void *arg)
         sprintf(message,"%s","\nCommands:\na  add word to the tree\nf  find word in tree\ns  search words matching prefix\nd  delete word from the tree\nq  quit, freeing all data\n\nchoice: ");
         send(forClientSockfd[localindex],message,sizeof(message),0);//把上面的message傳給client
         recv(forClientSockfd[localindex],inputBuffer,sizeof(inputBuffer),0);//receive client 要執行什麼選項
-        printf("Get:thread %d :%s\n",localindex,inputBuffer);
+        printf("Get from thread %d :%s\n",localindex,inputBuffer);
         //char * sendinformation=malloc(sizeof(char)*256);
-        if(strcmp(inputBuffer,"a")==0) {
-            sprintf( message,"%s","enter word to add: ");
-            send(forClientSockfd[localindex],message,sizeof(message),0);
-            recv(forClientSockfd[localindex],inputBuffer,sizeof(inputBuffer),0);//拿到要加入的word
-            printf("Get:thread %d :%s\n",localindex,inputBuffer);
 
-            sprintf(Top,"%s",inputBuffer);
+        if(strcmp(inputBuffer,"a")==0) {//選項a: add word
+            sprintf( message,"%s","enter word to add: ");
+            send(forClientSockfd[localindex],message,sizeof(message),0);//傳enter word to add:給client
+            recv(forClientSockfd[localindex],inputBuffer,sizeof(inputBuffer),0);//拿到要加入的word
+            printf("Get from thread %d :%s\n",localindex,inputBuffer);
+
+            sprintf(Top,"%s",inputBuffer);//把接收到的字串給Top
             rmcrlf(Top);
 
             p = Top;
             t1 = tvgetf();
-            /* FIXME: insert reference to each string */
+            /*insert reference to each string */
             if(bloom_test(bloom,Top)==1)//已經被filter偵測存在，不要走tree
                 res=NULL;
             else { //否則就去走訪tree加入,並加入bloom filter
@@ -205,16 +198,18 @@ void *thread_function(void *arg)
                 res = tst_ins_del(&root, &p, INS, REF);
             }
             t2 = tvgetf();
-            if (res) {
+            if (res) {//如果res!=NULL表示有 insert 成功
                 idx++;
                 Top += (strlen(Top) + 1);
                 printf("  %s - inserted in %.10f sec. (%d words in tree)\n",
                        (char *) res, t2 - t1,idx);
+                //把成功的訊息傳給client
                 sprintf(message,"  %s - inserted in %.10f sec. (%d words in tree)\n",(char *) res, t2 - t1,idx);
                 send(forClientSockfd[localindex],message,sizeof(message),0);
-            } else {
+            } else {//否則失敗
 
                 printf("  %s - already exists in list.\n", (char *) res);
+                //把失敗的訊息傳給client
                 sprintf(message,"  %s - already exists in list.\n", (char *) res);
                 send(forClientSockfd[localindex],message,sizeof(message),0);
             }
