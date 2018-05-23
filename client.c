@@ -27,35 +27,40 @@ int main(int argc, char **argv)
     if(err==-1) {
         printf("Connection error");
     }
-
-    char message;//[256]={};
-    char receiveMessage[512] = {};
-    char information[256]= {};
+    char *message=malloc(sizeof(char)*1024);
+    //char message;//[256]={};
+    char receiveMessage[1024];
+    //char * information=malloc(sizeof(char)*256);
     char ready='i';
-    int size;
+//    int size;
     while(1) {
-        //char* receiveMessage=malloc(sizeof(char)*512);
-        //memset(receiveMessage,'\0',sizeof(receiveMessage));
+        // char* receiveMessage=malloc(sizeof(char)*1024);
+//        memset(receiveMessage,'\0',sizeof(receiveMessage));
 //      recv(sockfd,&size,1,0);
+
         recv(sockfd,receiveMessage,sizeof(receiveMessage),0);//先接到要求的訊息
         printf("%s",receiveMessage);
 
-        scanf(" %c",&message);
-        send(sockfd,&message,sizeof(message),0);//送出request
+        scanf(" %s",message);
+        send(sockfd,message,sizeof(message),0);//送出request
 
-        if(message=='a') {//如果自己送出的request==a
-            recv(sockfd,information,sizeof(information),0);
-            printf("%s\n",information);
-        } else if (message=='f') {
-            recv(sockfd,information,sizeof(information),0);
-            printf("%s\n",information);
-        } else if (message=='s') {
-            recv(sockfd,information,sizeof(information),0);
-            printf("%s\n",information);
-        } else if (message=='d') {
-            recv(sockfd,information,sizeof(information),0);
-            printf("%s\n",information);
-        } else if (message=='q') {
+        if(strcmp(message,"a")==0) {//如果自己送出的request==a
+            recv(sockfd,receiveMessage,sizeof(receiveMessage),0);//接收add what word?
+            printf("%s\n",receiveMessage);
+            scanf(" %s",message);
+            send(sockfd,message,sizeof(message),0);//送出要add什麼字
+            recv(sockfd,receiveMessage,sizeof(receiveMessage),0);//接收是否add成功
+            printf("%s\n",receiveMessage);
+        } else if (strcmp(message,"f")==0) {
+            recv(sockfd,receiveMessage,sizeof(receiveMessage),0);
+            printf("%s\n",receiveMessage);
+        } else if (strcmp(message,"s")==0) {
+            recv(sockfd,receiveMessage,sizeof(receiveMessage),0);
+            printf("%s\n",receiveMessage);
+        } else if (strcmp(message,"d")==0) {
+            recv(sockfd,receiveMessage,sizeof(receiveMessage),0);
+            printf("%s\n",receiveMessage);
+        } else if (strcmp(message,"q")==0) {
             close(sockfd);
             exit(0);
         }
