@@ -1,4 +1,3 @@
-#include "server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -82,7 +81,6 @@ int main(int argc, char **argv)
 void *thread_function(void *arg)
 {
     char inputBuffer;//[256]={};
-    char *infor=(char*)malloc(sizeof(char)*256);
     int localindex = *((int*)arg);
     char ready='i' ;
     char message[512]="\nCommands:\na  add word to the tree\nf  find word in tree\ns  search words matching prefix\nd  delete word from the tree\nq  quit, freeing all data\n\nchoice: ";
@@ -94,10 +92,24 @@ void *thread_function(void *arg)
         //        send(forClientSockfd[localindex],&size,1,0);
         send(forClientSockfd[localindex],message,sizeof(message),0);//把上面的message傳給client
         recv(forClientSockfd[localindex],&inputBuffer,sizeof(inputBuffer),0);//receive client 要執行什麼選項
-        printf("Get:
-               thread %d :
-               %c\n",localindex,inputBuffer);
-
+        printf("Get:thread %d :%c\n",localindex,inputBuffer);
+        char sendinformation[256];
+        if(inputBuffer=='a') {
+            sprintf(sendinformation,"%s","serversend: a");
+            send(forClientSockfd[localindex],sendinformation,sizeof(sendinformation),0);
+        } else if(inputBuffer=='f') {
+            sprintf(sendinformation,"%s","serversend: f");
+            send(forClientSockfd[localindex],sendinformation,sizeof(sendinformation),0);
+        } else if(inputBuffer=='s') {
+            sprintf(sendinformation,"%s","serversend: s");
+            send(forClientSockfd[localindex],sendinformation,sizeof(sendinformation),0);
+        } else if(inputBuffer=='d') {
+            sprintf(sendinformation,"%s","serversend: d");
+            send(forClientSockfd[localindex],sendinformation,sizeof(sendinformation),0);
+        } else if(inputBuffer=='q') {
+            break;//跳出去準備關這個client的socket
+        }
+        recv(forClientSockfd[localindex],&ready,sizeof(ready),0);//試的時候連續傳送都會錯誤,所以這裡收一個dummy的東西,表示已經準備好跑下一次while傳訊息出去。
     }
-    close(forClientSockfd[localindex])//到這裡表示client要關閉了，就斷開與他的連結
+    close(forClientSockfd[localindex]);//到這裡表示client要關閉了，就斷開與他的連結
 }

@@ -1,63 +1,36 @@
-TESTS = test_cpy test_ref
+#!/bin/bash
 
-TEST_DATA = s Tai
+CC= gcc -std=c99
+CCFLAGS= -Wall
+OPTIMIZE= -O3
 
-CFLAGS = -Wall -Werror -g
+SERVER= server
+CLIENT= client
+TARGET_SERVER= server.c
+TARGET_CLIENT= client.c
+GIT_HOOKS := .git/hooks/pre-commit
+EXEC= target
 
-# Control the build verbosity                                                   
-ifeq ("$(VERBOSE)","1")
-    Q :=
-    VECHO = @true
-else
-    Q := @
-    VECHO = @printf
-endif
-
-GIT_HOOKS := .git/hooks/applied
-
-.PHONY: all clean
-
-all: $(GIT_HOOKS) $(TESTS)
+.PHONY: all
+all: $(EXEC)
 
 $(GIT_HOOKS):
 	@scripts/install-git-hooks
 	@echo
 
-OBJS_LIB = \
-    tst.o bloom.o
+target:
+	$(CC) -o $(SERVER) $(CCFLAGS) $(OPTIMIZE) $(TARGET_SERVER) -pthread
+	$(CC) -o $(CLIENT) $(CCFLAGS) $(OPTIMIZE) $(TARGET_CLIENT) -pthread
 
-OBJS := \
-    $(OBJS_LIB) \
-    test_cpy.o \
-    test_ref.o
+debug:
+	$(CC) -o $(SERVER) $(CCFLAGS) -g $(TARGET_SERVER) -pthread
+	$(CC) -o $(CLIENT) $(CCFLAGS) -g $(TARGET_CLIENT) -pthread
 
-deps := $(OBJS:%.o=.%.o.d)
-
-test_%: test_%.o $(OBJS_LIB)
-	$(VECHO) "  LD\t$@\n"
-	$(Q)$(CC) $(LDFLAGS)  -o $@ $^ -lm
-
-%.o: %.c
-	$(VECHO) "  CC\t$@\n"
-	$(Q)$(CC) -o $@ $(CFLAGS) -c -MMD -MF .$@.d $<
-
-test:  $(TESTS)
-	echo 3 | sudo tee /proc/sys/vm/drop_caches;
-	perf stat --repeat 100 \
-                -e cache-misses,cache-references,instructions,cycles \
-                ./test_cpy --bench $(TEST_DATA)
-	perf stat --repeat 100 \
-                -e cache-misses,cache-references,instructions,cycles \
-				./test_ref --bench $(TEST_DATA)
-
-bench: $(TESTS)
-	@for test in $(TESTS); do\
-		./$$test --bench; \
-		done
+prof:
+	$(CC) -o $(SERVER) $(CCFLAGS) -g -pg $(TARGET_SERVER) -pthread
+	$(CC) -o $(CLIENT) $(CCFLAGS) -g -pg $(TARGET_CLIENT) -pthread
 
 clean:
-	$(RM) $(TESTS) $(OBJS)
-	$(RM) $(deps)
-	rm -f  bench_cpy.txt bench_ref.txt ref.txt cpy.txt caculate
-	rm -f unit-test/testdict unit-test/bloomtest
--include $(deps)
+	rm -rf $(SERVER)
+	rm -rf $(CLIENT)
+	rm -rf gmon.out

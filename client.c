@@ -1,4 +1,3 @@
-#include "client.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,11 +42,28 @@ int main(int argc, char **argv)
 
         scanf(" %c",&message);
         send(sockfd,&message,sizeof(message),0);//送出request
-    }
-exit:
-    printf("close Socket.\n");
-    close(sockfd);
 
+        if(message=='a') {//如果自己送出的request==a
+            recv(sockfd,information,sizeof(information),0);
+            printf("%s\n",information);
+        } else if (message=='f') {
+            recv(sockfd,information,sizeof(information),0);
+            printf("%s\n",information);
+        } else if (message=='s') {
+            recv(sockfd,information,sizeof(information),0);
+            printf("%s\n",information);
+        } else if (message=='d') {
+            recv(sockfd,information,sizeof(information),0);
+            printf("%s\n",information);
+        } else if (message=='q') {
+            close(sockfd);
+            exit(0);
+        }
+        //送出一個dummy的訊息
+        ready='i';
+        send(sockfd,&ready,sizeof(ready),0);
+
+    }
     return 0;
 }
 
