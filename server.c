@@ -65,11 +65,7 @@ int idx=0;
 int main(int argc, char **argv)
 {
 //-------------------------------------------------------------插入資料進tire
-//   	char word[WRDMAX] = "";
-//   	char *sgl[LMAX] = {NULL};
     int rtn = 0;
-    //	int  sidx = 0;
-//   	tst_node * res = NULL;
     FILE *fp = fopen(IN_FILE, "r");
     double t1, t2;
 
@@ -259,10 +255,33 @@ void *thread_function(void *arg)
             }
 
         } else if(strcmp(inputBuffer,"s")==0) {
-            sprintf(message,"%s","serversend: s");
+            char *sgl[LMAX] = {NULL};
+            int sidx = 0;
+            char word[WRDMAX] = "";
+            sprintf(message,"find words matching prefix (at least 1 char): ");
             send(forClientSockfd[localindex],message,sizeof(message),0);
+            recv(forClientSockfd[localindex],inputBuffer,sizeof(inputBuffer),0);//從client拿到要找的word
+            printf("Get from thread %d :%s\n",localindex,inputBuffer);
+            sprintf(word,"%s",inputBuffer);
 
+            rmcrlf(word);
+            t1 = tvgetf();
+            res = tst_search_prefix(root, word, sgl, &sidx, LMAX);
+            t2 = tvgetf();
+            if (res) {
+                sprintf(message,"  %s - searched prefix in %.6f sec\n\n", word, t2 - t1);
+                char * temp=malloc(128);
+                for (int i = 0; i < sidx; i++) {
+                    sprintf(temp,"suggest[%d] : %s\n", i, sgl[i]);
+                    strcat(message,temp);
+                }
+                free(temp);
 
+            } else {
+                sprintf(message,"  %s - not found\n", word);
+            }
+            //把字串收集好後一次傳送，以免大量傳送造成的i/o負擔
+            send(forClientSockfd[localindex],message,sizeof(message),0);
         }
         /*
         else if(strcmp(inputBuffer,"d")==0) {
