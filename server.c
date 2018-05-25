@@ -214,15 +214,62 @@ void *thread_function(void *arg)
                 send(forClientSockfd[localindex],message,sizeof(message),0);
             }
         } else if(strcmp(inputBuffer,"f")==0) {
-            sprintf(message,"%s","serversend: f");
+            char word[WRDMAX] = "";
+            sprintf(message,"%s","find word in tree:");
             send(forClientSockfd[localindex],message,sizeof(message),0);
+            recv(forClientSockfd[localindex],inputBuffer,sizeof(inputBuffer),0);//從client拿到要找的word
+            printf("Get from thread %d :%s\n",localindex,inputBuffer);
+            sprintf(word,"%s",inputBuffer);
+
+            rmcrlf(word);
+            t1 = tvgetf();
+
+            //用bloom filter去判斷是否在 tree 內
+            if (bloom_test(bloom,word)==1) {//如果bloom filter有找到
+                //version1:bloom filter偵測到在裡面就不走下去了
+                t2 = tvgetf();
+                //printf("  Bloomfilter found %s in %.6f sec.\n",word, t2 - t1);
+                //printf("  Probability of false positives:%lf\n",pow(1 - exp(-(double)HashNumber /(double) ((double)TableSize /(double) idx)), HashNumber));
+                sprintf(message,"  Bloomfilter found %s in %.6f sec.\n  Probability of false positives:%lf\n" \
+                        ,word, t2 - t1,pow(1 - exp(-(double)HashNumber /(double) ((double)TableSize /(double) idx)), HashNumber));
+                // version2:bloom filter偵測到在裡面,就去走tree(防止偵測錯誤)
+                t1 = tvgetf();
+                res = tst_search(root, word);
+                t2 = tvgetf();
+                if(res) { //如果bloom filter有找到且tree也有找到
+                    //printf("  ----------\n  Tree found %s in %.6f sec.\n", (char *) res, t2- t1);
+                    //這裡因為要把字串收集在char * message裡面,所以用strcat串起來
+                    char * temp =malloc(128);
+                    sprintf(temp,"  ----------\n  Tree found %s in %.6f sec.\n", (char *) res, t2- t1);
+                    strcat(message,temp);
+                    free(temp);
+                } else { //如果bloom filter有找到但是tree沒有找到
+                    //printf("  ----------\n  %s not found by tree.\n", word);
+                    char * temp =malloc(128);
+                    sprintf(temp,"  ----------\n  %s not found by tree.\n", word);
+                    strcat(message,temp);
+                    free(temp);
+                }
+                //把字串收集好後一次傳送，以免大量傳送造成的i/o負擔
+                send(forClientSockfd[localindex],message,sizeof(message),0);
+            } else { //bloom filter沒找到
+                //printf("  %s not found by bloom filter.\n", word);
+                sprintf(message,"  %s not found by bloom filter.\n", word);
+                send(forClientSockfd[localindex],message,sizeof(message),0);
+            }
+
         } else if(strcmp(inputBuffer,"s")==0) {
             sprintf(message,"%s","serversend: s");
             send(forClientSockfd[localindex],message,sizeof(message),0);
-        } else if(strcmp(inputBuffer,"d")==0) {
+
+
+        }
+        /*
+        else if(strcmp(inputBuffer,"d")==0) {
             sprintf(message,"%s","serversend: d");
             send(forClientSockfd[localindex],message,sizeof(message),0);
-        } else if(strcmp(inputBuffer,"q")==0) {
+        }*/
+        else if(strcmp(inputBuffer,"q")==0) {
             break;//跳出去準備關這個client的socket
         }
         recv(forClientSockfd[localindex],&ready,sizeof(ready),0);//試的時候連續傳送都會錯誤,所以這裡收一個dummy的東西,表示已經準備好跑下一次while傳訊息出去。
