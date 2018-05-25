@@ -274,13 +274,20 @@ void *thread_function(void *arg)
                 for (int i = 0; i < sidx; i++) {
                     sprintf(temp,"suggest[%d] : %s\n", i, sgl[i]);
                     strcat(message,temp);
+
+                    if(strlen(message)>999||i==sidx-1) { //如果是最後一輪了，或是buufer快要overflow了，就要傳資料出去
+                        send(forClientSockfd[localindex],message,sizeof(message),0);
+                        sprintf(message,"%s","");
+                    }
                 }
                 free(temp);
 
             } else {
                 sprintf(message,"  %s - not found\n", word);
+                send(forClientSockfd[localindex],message,sizeof(message),0);
             }
-            //把字串收集好後一次傳送，以免大量傳送造成的i/o負擔
+            //最後記得告訴client已經傳送完畢，不用再接message
+            sprintf(message,"Server send over");
             send(forClientSockfd[localindex],message,sizeof(message),0);
         }
         /*
