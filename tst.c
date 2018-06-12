@@ -6,6 +6,7 @@
 
 /** ternary search tree node. */
 typedef struct tst_node {
+    int index;
     char key;               /* char key for node (null for node with string) */
     unsigned refcnt;        /* refcnt tracks occurrence of word (for delete) */
     struct tst_node *lokid; /* ternary low child pointer */
@@ -215,7 +216,7 @@ static void *tst_del_word(tst_node **root,
  *  non-zero), NULL on allocation failure on insert, or on successful removal
  *  of 's' from tree.
  */
-void *tst_ins_del(tst_node **root, char *const *s, const int del, const int cpy)
+void *tst_ins_del(tst_node **root, char *const *s, const int del, const int cpy, int count)
 {
     int diff;
     const char *p = *s;
@@ -279,6 +280,7 @@ void *tst_ins_del(tst_node **root, char *const *s, const int del, const int cpy)
                 curr->eqkid = (tst_node *) eqdata;
                 return (void *) eqdata;
             } else { /* save pointer to 's' (allocated elsewhere) */
+                curr->index = count;
                 curr->eqkid = (tst_node *) *s;
                 return (void *) *s;
             }
@@ -297,8 +299,10 @@ void *tst_search(const tst_node *p, const char *s)
     while (curr) {                 /* loop over each char in 's' */
         int diff = *s - curr->key; /* calculate the difference */
         if (diff == 0) {           /* handle the equal case */
-            if (*s == 0)           /* if *s = curr->key = nul-char, 's' found */
+            if (*s == 0) {          /* if *s = curr->key = nul-char, 's' found */
+                explain_index = curr->index; /*儲存單字解釋的index*/
                 return (void *) curr->eqkid; /* return pointer to 's' */
+            }
             s++;
             curr = curr->eqkid;
         } else if (diff < 0) /* handle the less than case */

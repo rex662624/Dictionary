@@ -27,7 +27,8 @@ int main(int argc, char **argv)
     if(err==-1) {
         printf("Connection error");
     }
-    char *message=malloc(sizeof(char)*1024);
+    //char *message=malloc(sizeof(char)*1024);
+    char message[1024];
     //char message;//[256]={};
     char receiveMessage[1024];
     //char * information=malloc(sizeof(char)*256);
@@ -49,6 +50,11 @@ int main(int argc, char **argv)
             printf("%s\n",receiveMessage);
             scanf(" %s",message);
             send(sockfd,message,sizeof(message),0);//送出要add什麼字
+
+            recv(sockfd,receiveMessage,sizeof(receiveMessage),0);//接收what is it's explanation?
+            printf("%s\n",receiveMessage);
+            scanf(" %[^\t\n]",message);
+            send(sockfd,message,sizeof(message),0);//送出字的解釋
             recv(sockfd,receiveMessage,sizeof(receiveMessage),0);//接收是否add成功
             printf("%s\n",receiveMessage);
         } else if (strcmp(message,"f")==0) {

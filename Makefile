@@ -1,7 +1,7 @@
 TESTS = server client
 
 TEST_DATA = s Tai
-CFLAGS = -Wall -Werror -g
+CFLAGS = -Wall -Werror -g -std=gnu99
 
 # Control the build verbosity                                                   
 ifeq ("$(VERBOSE)","1")

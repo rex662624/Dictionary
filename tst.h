@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+int explain_index;
 /* forward declaration of ternary search tree */
 typedef struct tst_node tst_node;
 
@@ -21,7 +22,8 @@ typedef struct tst_node tst_node;
 void *tst_ins_del(tst_node **root,
                   char *const *s,
                   const int del,
-                  const int cpy);
+                  const int cpy,
+                  int count);
 
 /** tst_search(), non-recursive find of a string in ternary tree.
  *  returns pointer to 's' on success, NULL otherwise.
