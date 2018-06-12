@@ -19,14 +19,16 @@
 #include "bloom.h"
 #define TableSize 5000000	//bloom filter 的大小
 #define HashNumber 2	//有多少個 hash function
-enum { INS, DEL, WRDMAX = 256, STKMAX = 512, LMAX = 1024 };
+enum { INS, DEL, WRDMAX = 256, STKMAX = 512, LMAX = 4096 };
 #define REF INS
 #define CPY DEL
 
 #define BENCH_TEST_FILE "bench_ref.txt"
 
+#define IN_FILE "dictionary.txt"
+
 long poolsize = 2000000*WRDMAX;
-char explain[1000000][1024];  //放解釋
+char explain[100000][10240];  //放解釋
 int count =0;     //計算解釋array的index
 
 /* simple trim '\n' from end of buffer filled by fgets */
@@ -48,7 +50,6 @@ static double tvgetf(void)
 
     return sec;
 }
-#define IN_FILE "dictionary.txt"
 
 
 int sockfd = 0;
@@ -63,6 +64,9 @@ char * Top;
 tst_node *root = NULL;
 bloom_t bloom;
 int idx=0;
+//------------------共享read write lock
+pthread_rwlock_t tree_lock;
+pthread_rwlock_t bloom_lock;
 
 int main(int argc, char **argv)
 {
@@ -83,10 +87,10 @@ int main(int argc, char **argv)
 //******memorypool*****
     pool = (char *) malloc(poolsize * sizeof(char));
     Top = pool;
-    char line[1024];
+    char line[4096];
 
 
-    while (fgets(line,1024,fp) != NULL) {
+    while (fgets(line,4096,fp) != NULL) {
         if(line[0] == '\n')
             continue;
         //單字存入Top,解釋存入array
@@ -111,7 +115,9 @@ int main(int argc, char **argv)
     t2 = tvgetf();
     fclose(fp);
     printf("ternary_tree, loaded %d words in %.6f sec\n", idx,t2-t1);
-
+//-----------------initilize lock
+    pthread_rwlock_init(&tree_lock, NULL);
+    pthread_rwlock_init(&bloom_lock, NULL);
 //--------------------------------------------------------------------建立socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -167,30 +173,24 @@ int main(int argc, char **argv)
 
 void *thread_function(void *arg)
 {
-    //char *inputBuffer=malloc(sizeof(char)*1024);//[256]={};
-    char inputBuffer[1024];
+    char inputBuffer[4096];
     int localindex = *((int*)arg);
     char ready='i' ;
-    //char * message = malloc(sizeof(char)*256);
-    //sprintf(message,"%s","\nCommands:\na  add word to the tree\nf  find word     in tree\ns  search words matching prefix\nd  delete word from the tree\nq      quit, freeing all data\n\nchoice: ");
-    char message[1024];
-    char tempexp[1024];
-//    int size;
+    char message[4096];
+    char tempexp[4096];
 
     //------------------prefix srarch--------
     double t1, t2;
     char *p;
     tst_node * res = NULL;
-//	char *sgl[LMAX] = {NULL};
-    //int rtn=0,sidx=0;
     while(1) {
         sprintf(message,"%s","\nCommands:\na  add word to the tree\nf  find word in tree\ns  search words matching prefix\nd  delete word from the tree\nq  quit, freeing all data\n\nchoice: ");
         send(forClientSockfd[localindex],message,sizeof(message),0);//把上面的message傳給client
         recv(forClientSockfd[localindex],inputBuffer,sizeof(inputBuffer),0);//receive client 要執行什麼選項
         printf("Get from thread %d :%s\n",localindex,inputBuffer);
-        //char * sendinformation=malloc(sizeof(char)*256);
 
         if(strcmp(inputBuffer,"a")==0) {//選項a: add word
+
             sprintf( message,"%s","enter word to add: ");
             send(forClientSockfd[localindex],message,sizeof(message),0);//傳enter word to add:給client
             recv(forClientSockfd[localindex],inputBuffer,sizeof(inputBuffer),0);//拿到要加入的word
@@ -209,12 +209,22 @@ void *thread_function(void *arg)
             p = Top;
             t1 = tvgetf();
             /*insert reference to each string */
-            if(bloom_test(bloom,Top)==1)//已經被filter偵測存在，不要走tree
+            pthread_rwlock_rdlock(&bloom_lock);
+            int bloomret=bloom_test(bloom,Top);
+            pthread_rwlock_unlock(&bloom_lock);
+            if(bloomret==1)//已經被filter偵測存在，不要走tree
                 res=NULL;
             else { //否則就去走訪tree加入,並加入bloom filter
+                pthread_rwlock_wrlock(&bloom_lock);//因為要修改資料結構，用write lock
                 bloom_add(bloom,Top);
+                pthread_rwlock_unlock(&bloom_lock);
+
+                pthread_rwlock_wrlock(&tree_lock);//因為要修改資料結構，用write lock
                 res = tst_ins_del(&root, &p, INS, REF, count);
+                pthread_rwlock_unlock(&tree_lock);
             }
+
+
             t2 = tvgetf();
             if (res) {//如果res!=NULL表示有 insert 成功
                 idx++;
@@ -234,7 +244,9 @@ void *thread_function(void *arg)
                 sprintf(message,"  %s - already exists in list.\n", (char *) res);
                 send(forClientSockfd[localindex],message,sizeof(message),0);
             }
+
         } else if(strcmp(inputBuffer,"f")==0) {
+
             char word[WRDMAX] = "";
             sprintf(message,"%s","find word in tree:");
             send(forClientSockfd[localindex],message,sizeof(message),0);
@@ -246,7 +258,11 @@ void *thread_function(void *arg)
             t1 = tvgetf();
 
             //用bloom filter去判斷是否在 tree 內
-            if (bloom_test(bloom,word)==1) {//如果bloom filter有找到
+            pthread_rwlock_rdlock(&bloom_lock);//readlock
+            int bloomret=bloom_test(bloom,word);
+            pthread_rwlock_unlock(&bloom_lock);
+            if (bloomret==1) {//如果bloom filter有找到
+
                 //version1:bloom filter偵測到在裡面就不走下去了
                 t2 = tvgetf();
                 //printf("  Bloomfilter found %s in %.6f sec.\n",word, t2 - t1);
@@ -255,12 +271,13 @@ void *thread_function(void *arg)
                         ,word, t2 - t1,pow(1 - exp(-(double)HashNumber /(double) ((double)TableSize /(double) idx)), HashNumber));
                 // version2:bloom filter偵測到在裡面,就去走tree(防止偵測錯誤)
                 t1 = tvgetf();
+                pthread_rwlock_rdlock(&tree_lock);//這裡是讀取 用readlock
                 res = tst_search(root, word);
+                pthread_rwlock_unlock(&tree_lock);
                 t2 = tvgetf();
                 if(res) { //如果bloom filter有找到且tree也有找到
-                    //printf("  ----------\n  Tree found %s in %.6f sec.\n", (char *) res, t2- t1);
                     //這裡因為要把字串收集在char * message裡面,所以用strcat串起來
-                    char * temp =malloc(1024);
+                    char * temp =malloc(4096);
                     //單字跟解釋一起傳到client端
                     sprintf(temp,"  ----------\n  Tree found %s in %.6f sec.\n%s\n%s\n", (char *) res, t2- t1,(char *) res,explain[explain_index]);
                     strcat(message,temp);
@@ -275,7 +292,6 @@ void *thread_function(void *arg)
                 //把字串收集好後一次傳送，以免大量傳送造成的i/o負擔
                 send(forClientSockfd[localindex],message,sizeof(message),0);
             } else { //bloom filter沒找到
-                //printf("  %s not found by bloom filter.\n", word);
                 sprintf(message,"  %s not found by bloom filter.\n", word);
                 send(forClientSockfd[localindex],message,sizeof(message),0);
             }
@@ -292,7 +308,9 @@ void *thread_function(void *arg)
 
             rmcrlf(word);
             t1 = tvgetf();
+            pthread_rwlock_rdlock(&tree_lock);
             res = tst_search_prefix(root, word, sgl, &sidx, LMAX);
+            pthread_rwlock_unlock(&tree_lock);
             t2 = tvgetf();
             if (res) {
                 sprintf(message,"  %s - searched prefix in %.6f sec\n\n", word, t2 - t1);

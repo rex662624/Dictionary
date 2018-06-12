@@ -27,15 +27,15 @@ int main(int argc, char **argv)
     if(err==-1) {
         printf("Connection error");
     }
-    //char *message=malloc(sizeof(char)*1024);
-    char message[1024];
+    //char *message=malloc(sizeof(char)*4096);
+    char message[4096];
     //char message;//[256]={};
-    char receiveMessage[1024];
+    char receiveMessage[4096];
     //char * information=malloc(sizeof(char)*256);
     char ready='i';
 //    int size;
     while(1) {
-        // char* receiveMessage=malloc(sizeof(char)*1024);
+        // char* receiveMessage=malloc(sizeof(char)*4096);
 //        memset(receiveMessage,'\0',sizeof(receiveMessage));
 //      recv(sockfd,&size,1,0);
 
